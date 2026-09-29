@@ -1,6 +1,16 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+username = os.getenv("CONFLUENCE_USERNAME")
+password = os.getenv("CONFLUENCE_PASSWORD")
+
+
 def parseTable(table):
     rows = table.find_all("tr")
     if not rows:
