@@ -2,13 +2,6 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-username = os.getenv("CONFLUENCE_USERNAME")
-password = os.getenv("CONFLUENCE_PASSWORD")
 
 
 def parseTable(table):
@@ -33,11 +26,10 @@ def parseTable(table):
                 row_data[headers[i]] = value
         table_rows.append(row_data)
     return {
-        "headers": headers,
         "rows": table_rows
     }
-def parseConfluence(url):
-    response = requests.get(url,auth=("",""))
+def parseConfluence(url,username,password):
+    response = requests.get(url,auth=(username,password))
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
     for element in soup(["script", "style", "nav", "footer"]):
