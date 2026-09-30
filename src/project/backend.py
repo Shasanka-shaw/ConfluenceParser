@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+from project.parse import getRawHtml
 
 
 
@@ -28,10 +29,11 @@ def parseTable(table):
     return {
         "rows": table_rows
     }
-def parseConfluence(url,username,password):
-    response = requests.get(url,auth=(username,password))
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
+def parseConfluence(url):
+
+    raw_html=getRawHtml(url)
+    soup = BeautifulSoup(raw_html, "html.parser")
+  
     for element in soup(["script", "style", "nav", "footer"]):
         element.decompose()
     sections = {}
@@ -39,40 +41,66 @@ def parseConfluence(url,username,password):
     current_content = []
     current_tables = []
     current_images = []
+    current_svg = ""
+
+
+    #for loop
     for element in soup.find_all(
-        ["h1", "h2", "h3", "h4", "p", "li", "table","img"]
+        ["h1", "h2", "h3", "h4", "p", "li", "table","img","div"]
     ):
+        #parsing table
         if element.name == "table":
             table_data = parseTable(element)
             if current_heading:
                 current_tables.append(table_data)
             continue
-        if element.name=="img" and element.get("src"):
-            img_src=element.get("src")
-            img_src=urljoin(url,img_src)
-            current_images.append(img_src)
-            continue
-        text = element.get_text(" ", strip=True)
-        if not text:
-            continue    
-        if element.name in ["h1", "h2", "h3", "h4"]:
-            if current_heading:
-                sections[current_heading] = {
-                    "content": " ".join(current_content),
-                    "tables": current_tables,
-                    "images":current_images
-                }
 
-            current_heading = text
-            current_content = []
-            current_tables = []
-            current_images=[]
-        else:
-            current_content.append(text)
+
+        #handling macros
+        if (
+            element.name == "div"
+            and element.get("id")
+            and element.get("id").startswith("drawio-macro-content-")
+        ):
+            img = element.find("img")
+            if img and img.get("src"):
+                img_src = img.get("src")
+                img_src = urljoin(url, img_src)
+                current_images.append(img_src)
+
+           
+            svg = element.find("svg")
+
+            if svg:
+                current_svg=svg
+            continue
+        else :
+            text = element.get_text(" ", strip=True)
+            if not text:
+                continue    
+            if element.name in ["h1", "h2", "h3", "h4"]:
+                if current_heading:
+                    sections[current_heading] = {
+                        "content": " ".join(current_content),
+                        "tables": current_tables,
+                        "figures":{"images":current_images,
+                                "svg":current_svg
+                                }
+                    }
+
+                current_heading = text
+                current_content = []
+                current_tables = []
+                current_images=[]
+                current_svg=""
+            elif element.name not in ["table","div"]:
+                current_content.append(text)
     if current_heading:
         sections[current_heading] = {
             "content": " ".join(current_content),
             "tables": current_tables,
-            "images":current_images
+            "figures":{"images":current_images,
+                       "svg":current_svg
+                       }
         }
     return sections
